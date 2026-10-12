@@ -385,7 +385,7 @@
       '',
       'Transcripts contain whatever was said in the chats, including any HTML. Open them in a text or Markdown editor rather than a browser.',
       '',
-      'Made with Chat Archive for Claude Design, an unofficial tool not affiliated with Anthropic.',
+      'Made with Design Chat Archive, an unofficial tool not affiliated with Anthropic.',
       '',
     );
     return lines.join('\n');

@@ -16,6 +16,7 @@ Security, privacy and robustness fixes after an independent review. No change to
 - The ZIP writer refuses to write an archive that would exceed the plain ZIP limits instead of silently wrapping.
 - The panel's shadow root is closed to page scripts; the API base URL is absolute.
 - Regression tests: `node test/run.js`.
+- Renamed to Design Chat Archive (the product name no longer leads with Anthropic's trademark), with a privacy policy (`PRIVACY.md`) and a Chrome Web Store submission kit in `store/`.
 
 ## 1.0.0 (2026-10-13)
 

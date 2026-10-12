@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Chat Archive for Claude Design (unofficial)",
+  "name": "Design Chat Archive",
   "short_name": "Chat Archive",
   "version": "1.0.1",
-  "description": "Export every conversation from your Claude Design projects to Markdown and JSON before the standalone site closes. Runs locally; no data leaves your browser.",
+  "description": "Export your Claude Design chats to Markdown before the site closes on 14 Dec 2026. Unofficial; nothing leaves your browser.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -11,7 +11,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Chat Archive for Claude Design",
+    "default_title": "Design Chat Archive",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -20,8 +20,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://claude.ai/design*"],
-      "js": ["src/zip.js", "src/render.js", "src/exporter.js", "src/panel.js"],
+      "matches": [
+        "https://claude.ai/design*"
+      ],
+      "js": [
+        "src/zip.js",
+        "src/render.js",
+        "src/exporter.js",
+        "src/panel.js"
+      ],
       "run_at": "document_idle"
     }
   ]

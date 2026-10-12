@@ -1,4 +1,6 @@
-# Chat Archive for Claude Design
+# Design Chat Archive
+
+Save your Claude Design chats before they're deleted.
 
 The standalone Claude Design site (claude.ai/design) closes on **14 December 2026**. Your projects can be downloaded, but **your chats are not migrated** and are deleted after the closure. This Chrome extension saves every conversation from every project in one click, as readable Markdown plus the complete raw data.
 
@@ -9,7 +11,7 @@ Unofficial. Not made by or affiliated with Anthropic.
   <img src="docs/exporting.png" alt="The same panel mid-export: two projects done with their chat counts, a progress bar, and Saving Trail running app (3 of 5)" width="367">
 </p>
 
-**[Download the latest release](https://github.com/jeshwanthshivasai/claude-design-chat-archive/releases/latest)** · [Install](#install-about-one-minute) · [How it works](#how-it-works) · [Privacy](#privacy-and-security)
+[Install](#install) · [How it works](#how-it-works) · [Privacy](#privacy-and-security) · [Privacy policy](PRIVACY.md)
 
 ## What you get
 
@@ -37,7 +39,11 @@ Claude's internal thinking is left out of the Markdown. It is in the raw JSON, w
 
 Your design files are **not** included. Download those per project from Claude Design: Share → Project HTML → Project archive.
 
-## Install (about one minute)
+## Install
+
+**Chrome Web Store:** coming soon; the listing is under review. Once it's live, that's the way to install: one click, and updates arrive automatically.
+
+**Until then, from GitHub (about one minute):**
 
 1. Open the [latest release](https://github.com/jeshwanthshivasai/claude-design-chat-archive/releases/latest), download **Source code (zip)** under Assets, and unzip it somewhere you'll keep it. Chrome loads the extension from that folder, so don't delete it afterwards.
 2. In Chrome, open `chrome://extensions`.
@@ -74,7 +80,7 @@ Everything above is the user-visible version of `src/`:
 - **Runs entirely in your browser**, using your existing Claude sign-in. It never sees your password or cookies; Chrome attaches the session to the requests, as it does for the page itself.
 - **Sends nothing anywhere.** The only network requests go to `claude.ai`, the site you're already on. No servers, no analytics, no crash reporting, no third-party code, no remote scripts.
 - **Stores nothing.** No settings, no cache, no browser storage. Close the tab and it's gone.
-- **No permissions in the manifest.** Chrome will still describe it as able to "read and change your data on claude.ai", because any extension that runs a script on a site gets that label. It runs only on `claude.ai/design` pages.
+- **Nothing beyond one site.** It asks for no permissions in the manifest. Chrome will still describe it as able to "read and change your data on claude.ai", because any extension that runs a script on a site gets that label. It runs only on `claude.ai/design` pages.
 - **Read-only.** It only makes the three requests above. It never sends a message, edits a project or changes a setting.
 - **Shared projects (Team and Enterprise):** projects teammates shared with you are listed but unticked by default. Their chats are exported only when the server states that the owner shared them with you; if it says no, or says nothing, none of that project's chats or raw data are exported. In shared chats with more than one writer, each message is labelled with the writer's display name.
 - **What the archive contains, so you can decide where to keep it:** the Markdown holds everything said in your chats, including client material, uploaded text, any local file paths you gave Claude, and the display names of people who wrote in shared chats. The optional raw JSON holds the complete project data as Claude Design stores it: every message, tool call and file edit (with file contents), Claude's thinking where present, unsent drafts, and internal IDs. Times are shown in your local time with its UTC offset. Treat the ZIP as private.
