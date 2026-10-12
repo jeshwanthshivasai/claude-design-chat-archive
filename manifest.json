@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chat Archive for Claude Design (unofficial)",
   "short_name": "Chat Archive",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Export every conversation from your Claude Design projects to Markdown and JSON before the standalone site closes. Runs locally; no data leaves your browser.",
   "icons": {
     "16": "icons/icon16.png",

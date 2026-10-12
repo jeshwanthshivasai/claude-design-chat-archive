@@ -7,33 +7,66 @@
   function fmtDate(iso, withTime = true) {
     if (!iso) return '—';
     const d = new Date(iso);
-    if (isNaN(d)) return String(iso);
+    if (isNaN(d)) return 'unknown date';
     const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     return withTime ? `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}` : day;
   }
 
-  function timeZone() {
-    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'; }
-    catch (e) { return 'local time'; }
+  // Date for use inside a file name: always YYYY-MM-DD or "undated", never raw input.
+  function fileDate(iso) {
+    const d = new Date(iso || NaN);
+    return isNaN(d) ? 'undated' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
+
+  // Local time is shown throughout; say the offset, not the zone name, which would reveal more than needed.
+  function timeZone() {
+    const off = -new Date().getTimezoneOffset();
+    const sign = off >= 0 ? '+' : '-';
+    const abs = Math.abs(off);
+    return `local time (UTC${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)})`;
+  }
+
+  // Message content is usually a string; tolerate arrays of blocks or objects from API changes.
+  function asText(v) {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) return v.map(asText).filter(Boolean).join('\n');
+    if (typeof v === 'object') return asText(v.text != null ? v.text : v.content);
+    return String(v);
+  }
+  const oneLine = (v) => asText(v).replace(/\s+/g, ' ').trim();
+  const cell = (v) => oneLine(v).replace(/\|/g, '\\|');            // safe inside a Markdown table
+  const linkText = (v) => cell(v).replace(/[\[\]]/g, '\\$&');        // safe inside [ ... ]
+  const heading = (v) => oneLine(v).replace(/^#+\s*/, '') || 'Untitled';
+
+  const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+
+  // Control, zero-width, bidi-override and BOM characters: invisible, and able to disguise a name.
+  const INVISIBLE = new RegExp('[\\u0000-\\u001f\\u007f\\u200b-\\u200f\\u2028-\\u202e\\u2066-\\u2069\\ufeff]', 'g');
 
   function sanitizeName(s, max = 80) {
     let out = String(s || '')
-      .replace(/[\u0000-\u001f\u007f]/g, ' ')
+      .replace(INVISIBLE, ' ')
       .replace(/[\\/]/g, '-')
       .replace(/[:*?"<>|]/g, '')
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/^[.\s]+|[.\s]+$/g, '');
-    if (out.length > max) out = out.slice(0, max).trim();
+    const chars = Array.from(out); // don't cut an emoji in half
+    if (chars.length > max) out = chars.slice(0, max).join('').trim().replace(/[.\s]+$/g, '');
+    if (WINDOWS_RESERVED.test(out)) out = '_' + out;
     return out || 'Untitled';
   }
 
-  function uniqueName(name, used) {
+  // Keys are normalised so "café" and "café" (decomposed) or "Hero" and "hero" cannot collide on
+  // case-insensitive or normalising file systems (macOS, Windows).
+  const nameKey = (n) => n.normalize('NFKC').toLowerCase();
+
+  function uniqueName(name, used, ext = '') {
     let n = name, i = 2;
-    while (used.has(n.toLowerCase())) n = `${name} (${i++})`;
-    used.add(n.toLowerCase());
-    return n;
+    while (used.has(nameKey(n + ext))) n = `${name} (${i++})`;
+    used.add(nameKey(n + ext));
+    return n + ext;
   }
 
   const HINT_KEYS = ['path', 'file_path', 'filePath', 'filename', 'name', 'title', 'query', 'url', 'pattern', 'description', 'text'];
@@ -77,7 +110,7 @@
 
   function assistantBody(m, includeSteps) {
     const blocks = Array.isArray(m.contentBlocks) ? m.contentBlocks : null;
-    if (!blocks || !blocks.length) return (m.content || '').trim();
+    if (!blocks || !blocks.length) return asText(m.content).trim();
     const parts = [];
     let pending = [];
     const flush = () => {
@@ -98,7 +131,7 @@
           break;
         case 'user_interjection': {
           flush();
-          const msg = (b.message && b.message.content) || '';
+          const msg = asText(b.message && b.message.content);
           if (msg.trim()) parts.push(`> **You, mid-turn:** ${msg.trim().replace(/\n/g, '\n> ')}`);
           break;
         }
@@ -110,7 +143,7 @@
     }
     flush();
     const body = parts.join('\n\n').trim();
-    return body || (m.content || '').trim();
+    return body || asText(m.content).trim();
   }
 
   function attachmentLines(atts) {
@@ -120,7 +153,7 @@
       if (!a) continue;
       const type = a.type || 'file';
       const content = typeof a.content === 'string' ? a.content : '';
-      const label = a.name || a.path || clip(content.split('\n')[0], 80) || 'untitled';
+      const label = oneLine(a.name || a.path || content.split('\n')[0]).slice(0, 80) || 'untitled';
       if (type === 'text' && /^<async_tool_result/.test(content)) {
         const tool = (content.match(/tool="([^"]+)"/) || [])[1] || 'background task';
         lines.push(`> *Background result from \`${tool}\`* (full text in the raw JSON)`);
@@ -136,6 +169,8 @@
   function optionLabel(o) {
     if (o == null) return '';
     if (typeof o === 'string') return /^\s*<svg/i.test(o) ? '[drawn option]' : clip(o, 70);
+    if (typeof o !== 'object') return clip(o, 70);
+    if (o.svg || (typeof o.value === 'string' && /^\s*<svg/i.test(o.value))) return clip(o.label || o.title || '[drawn option]', 70);
     return clip(o.label || o.title || o.name || o.value || o.text || JSON.stringify(o), 70);
   }
 
@@ -143,12 +178,12 @@
     if (!rec) return '';
     if (rec.event === 'closed') return '<sub>— Questions closed —</sub>';
     const spec = rec.spec || {};
-    const lines = [`**Claude asked: ${spec.title || 'a few questions'}**`];
+    const lines = [`**Claude asked: ${oneLine(spec.title) || 'a few questions'}**`];
     if (spec.prompt) lines.push('', clip(spec.prompt, 400));
     const qs = Array.isArray(spec.questions) ? spec.questions : [];
     if (qs.length) lines.push('');
     for (const q of qs) {
-      let line = `- ${q.title || q.id}`;
+      let line = `- ${oneLine(q.title) || q.id}`;
       if (q.subtitle) line += ` (${clip(q.subtitle, 120)})`;
       const opts = Array.isArray(q.options) ? q.options.map(optionLabel).filter(Boolean) : [];
       if (opts.length) line += `\n  Options: ${opts.slice(0, 8).join(' / ')}${opts.length > 8 ? ' / …' : ''}`;
@@ -176,14 +211,14 @@
     const r = m.questionReceipt || {};
     const titles = questionTitles.get(r.questionId) || questionTitles.get('*') || {};
     const payload = r.payload && typeof r.payload === 'object' ? r.payload : null;
-    if (!payload) return (m.content || '').trim();
+    if (!payload) return asText(m.content).trim();
     const lines = ['**Your answers**', ''];
     for (const [qid, v] of Object.entries(payload)) {
       if (qid === 'followUps') { if (v) lines.push('- Asked for follow-up questions'); continue; }
       const a = answerText(v);
       if (a) lines.push(`- ${titles[qid] || qid}: ${a}`);
     }
-    return lines.length > 2 ? lines.join('\n') : (m.content || '').trim();
+    return lines.length > 2 ? lines.join('\n') : asText(m.content).trim();
   }
 
   function turnChangesLine(tc) {
@@ -199,16 +234,18 @@
   function renderMessage(m, opts, ctx) {
     const when = fmtDate(m.timestamp);
     if (m.pill) {
-      const t = (m.content || '').replace(/\s+/g, ' ').trim();
+      const t = oneLine(m.content);
       return `<sub>— ${t || 'event'} · ${when} —</sub>`;
     }
     if (m.questionRecord && m.questionRecord.event === 'closed') return renderQuestionRecord(m.questionRecord);
     const isUser = m.role === 'user';
-    const who = isUser ? 'You' : m.role === 'assistant' ? 'Claude' : (m.role || 'Message');
+    // In a shared project several people can write; name them when there is more than one.
+    const who = isUser ? (ctx.multiAuthor && oneLine(m.authorName) ? oneLine(m.authorName) : 'You')
+      : m.role === 'assistant' ? 'Claude' : (oneLine(m.role) || 'Message');
     let body;
     if (m.questionRecord) body = renderQuestionRecord(m.questionRecord);
     else if (m.questionReceipt) body = renderQuestionReceipt(m, ctx.questionTitles);
-    else body = isUser ? (m.content || '').trim() : assistantBody(m, opts.includeSteps);
+    else body = isUser ? asText(m.content).trim() : assistantBody(m, opts.includeSteps);
     const extra = [...attachmentLines(m.attachments)];
     if (!isUser && opts.includeSteps) { const tc = turnChangesLine(m.turnChanges); if (tc) extra.push(tc); }
     return [
@@ -247,13 +284,14 @@
 
   function renderChat(project, chat, idx, opts) {
     const s = chatStats(chat);
-    const title = chat.title || `Chat ${idx}`;
+    const title = heading(chat.title) !== 'Untitled' ? heading(chat.title) : `Chat ${idx}`;
+    const authors = new Set((chat.messages || []).filter((m) => m && m.role === 'user' && !m.pill && m.authorName).map((m) => oneLine(m.authorName)));
     const head = [
       `# ${title}`,
       '',
       `| | |`,
       `|---|---|`,
-      `| Project | ${project.name} |`,
+      `| Project | ${cell(project.name)} |`,
       `| Chat | ${idx} of ${opts.chatCount} |`,
       `| Started | ${fmtDate(chat.created || s.first)} |`,
       `| Last message | ${fmtDate(s.last)} |`,
@@ -261,21 +299,21 @@
       `| Times shown in | ${timeZone()} |`,
       '',
     ].join('\n') + '\n---\n\n';
-    const ctx = { questionTitles: questionTitleMap(chat) };
+    const ctx = { questionTitles: questionTitleMap(chat), multiAuthor: authors.size > 1 };
     const body = (chat.messages || []).map((m) => renderMessage(m, opts, ctx)).join('\n\n---\n\n');
     let tail = '';
     if (Array.isArray(chat.todos) && chat.todos.length) {
       tail = '\n\n---\n\n## Todo list at export time\n\n' +
-        chat.todos.map((t) => `- [${t.completed ? 'x' : ' '}] ${t.text || ''}`).join('\n');
+        chat.todos.map((t) => `- [${t && t.completed ? 'x' : ' '}] ${oneLine(t && t.text)}`).join('\n');
     }
     return head + body + tail + '\n';
   }
 
   function renderProjectIndex(project, entries) {
     const rows = entries.map((e) =>
-      `| ${e.idx} | [${e.title.replace(/\|/g, '/')}](<${e.file}>) | ${fmtDate(e.stats.first, false)} | ${fmtDate(e.stats.last, false)} | ${e.stats.total} |`);
+      `| ${e.idx} | [${linkText(e.title)}](<${e.file}>) | ${fmtDate(e.stats.first, false)} | ${fmtDate(e.stats.last, false)} | ${e.stats.total} |`);
     return [
-      `# ${project.name}`,
+      `# ${heading(project.name)}`,
       '',
       `Created ${fmtDate(project.createdAt || project.created, false)} · last updated ${fmtDate(project.updatedAt, false)} · ${entries.length} chat${entries.length === 1 ? '' : 's'}`,
       '',
@@ -289,7 +327,7 @@
   function renderResume(project, entries) {
     const files = entries.map((e) => `- ${e.file}`).join('\n') || '- (no chats)';
     return [
-      `# Continue "${project.name}" in Claude`,
+      `# Continue "${oneLine(project.name)}" in Claude`,
       '',
       '1. Start a new chat in Claude.',
       '2. Attach the project files ZIP you downloaded from Claude Design.',
@@ -302,7 +340,7 @@
       '---',
       '',
       '```text',
-      `I'm moving a design project called "${project.name}" from the standalone Claude Design site into this chat.`,
+      `I'm moving a design project called "${oneLine(project.name)}" from the standalone Claude Design site into this chat.`,
       'Attached are the project files (ZIP) and the full chat transcripts, numbered in the order they happened.',
       '',
       'Before changing anything:',
@@ -319,7 +357,7 @@
 
   function renderReadme(summary) {
     const rows = summary.projects.map((p) =>
-      `| [${p.name.replace(/\|/g, '/')}](<${p.folder}/${p.failed ? '_error.txt' : '_index.md'}>) | ${p.chats} | ${p.messages} | ${p.note || ''} |`);
+      `| [${linkText(p.name)}](<${p.folder}/${p.failed ? '_error.txt' : '_index.md'}>) | ${p.chats} | ${p.messages} | ${cell(p.note)} |`);
     const lines = [
       '# Claude Design chat archive',
       '',
@@ -336,11 +374,13 @@
       '- `_resume-in-claude.md`: how to pick the project up again in Claude, with a ready prompt.',
     ];
     if (summary.includeRaw) {
-      lines.push('- `_raw/project-data.json`: the complete original data, including every tool call and file edit, for re-processing.');
+      lines.push('- `_raw/project-data.json`: the complete original data as Claude Design stores it: every message, tool call and file edit (including file contents), Claude\'s thinking where present, unsent drafts, and internal IDs. Treat it as private.');
     }
     lines.push(
       '',
       'Your design files are not in this archive. Download those per project from Claude Design (Share → Project HTML → Project archive).',
+      '',
+      'Transcripts contain whatever was said in the chats, including any HTML. Open them in a text or Markdown editor rather than a browser.',
       '',
       'Made with Chat Archive for Claude Design, an unofficial tool not affiliated with Anthropic.',
       '',
@@ -349,7 +389,7 @@
   }
 
   Object.assign(NS, {
-    fmtDate, sanitizeName, uniqueName, sortedChats, chatStats,
+    fmtDate, fileDate, sanitizeName, uniqueName, sortedChats, chatStats, asText,
     renderChat, renderProjectIndex, renderResume, renderReadme, toolHint,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

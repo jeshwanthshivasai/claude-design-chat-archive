@@ -32,7 +32,13 @@
    * @param {{path: string, data: string|Uint8Array}[]} files
    * @returns {Uint8Array[]} chunks; wrap in a Blob in the browser.
    */
+  // Plain ZIP (no ZIP64): at most 65,535 entries and 4 GiB. Far beyond any chat archive, but
+  // fail loudly rather than write a count that wraps around and confuses extractors.
+  const MAX_ENTRIES = 0xffff;
+  const MAX_BYTES = 0xffffffff;
+
   function makeZip(files, now = new Date()) {
+    if (files.length > MAX_ENTRIES) throw new Error(`Too many files for one ZIP (${files.length}). Export fewer projects at a time.`);
     const { time, date } = dosDateTime(now);
     const chunks = [];
     const central = [];
@@ -41,6 +47,8 @@
     for (const f of files) {
       const name = enc.encode(f.path);
       const data = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+      f.data = null; // release the string; the bytes are what we keep from here on
+      if (offset + 30 + name.length + data.length > MAX_BYTES) throw new Error('The archive would exceed 4 GB. Export fewer projects at a time.');
       const crc = crc32(data);
 
       const local = new DataView(new ArrayBuffer(30));
@@ -81,6 +89,7 @@
     }
 
     const cdSize = central.reduce((s, c) => s + c.length, 0);
+    if (offset + cdSize + 22 > MAX_BYTES) throw new Error('The archive would exceed 4 GB. Export fewer projects at a time.');
     const end = new DataView(new ArrayBuffer(22));
     end.setUint32(0, 0x06054b50, true);
     end.setUint16(8, files.length, true);

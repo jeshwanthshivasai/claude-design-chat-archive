@@ -107,7 +107,7 @@
 
   const host = document.createElement('div');
   host.id = 'design-chat-archive';
-  const root = host.attachShadow({ mode: 'open' });
+  const root = host.attachShadow({ mode: 'closed' }); // page scripts can't reach into the panel
   root.innerHTML = `
     <style>${css}</style>
     <div class="wrap">
@@ -124,7 +124,7 @@
           <ul class="list" aria-labelledby="dce-count"><li class="empty">Loading your projects…</li></ul>
           <div class="opts">
             <label><input type="checkbox" id="dce-steps" checked> Show Claude's steps</label>
-            <label><input type="checkbox" id="dce-raw" checked> Include raw data (JSON)</label>
+            <label title="The complete data as Claude Design stores it, including file contents and internal IDs. Useful for re-processing; treat it as private."><input type="checkbox" id="dce-raw" checked> Include raw data (JSON)</label>
           </div>
           <div class="progress" aria-live="polite">
             <p class="readout"></p>
@@ -145,7 +145,7 @@
   const primary = $('.primary'), stopBtn = $('.secondary'), progress = $('.progress');
   const readout = $('.readout'), bar = $('.bar'), barFill = $('.bar > i');
 
-  let projects = null, running = false, signal = { aborted: false };
+  let projects = null, running = false, controller = null;
 
   const shortDate = (iso) => {
     if (!iso) return '';
@@ -167,7 +167,7 @@
     try {
       projects = await D.listProjects();
     } catch (e) {
-      list.innerHTML = `<li class="empty error">Couldn't load your projects. ${esc(e.message)}</li>`;
+      list.innerHTML = `<li class="empty error">Couldn't load your projects. ${esc(e.message)} Close and reopen this panel to try again.</li>`;
       return;
     }
     countEl.textContent = `${projects.length} project${projects.length === 1 ? '' : 's'}`;
@@ -207,7 +207,7 @@
   async function run() {
     const chosen = checked();
     if (!chosen.length) return;
-    running = true; signal = { aborted: false };
+    running = true; controller = new AbortController();
     primary.disabled = true; primary.textContent = 'Exporting…'; stopBtn.hidden = false;
     root.querySelectorAll('input').forEach((c) => (c.disabled = true));
     progress.classList.add('on'); readout.classList.remove('error');
@@ -222,7 +222,7 @@
       const { files, summary, rootDir } = await D.exportProjects(chosen, {
         includeSteps: $('#dce-steps').checked,
         includeRaw: $('#dce-raw').checked,
-        signal,
+        signal: controller.signal,
         onProgress: (p) => {
           const s = statusFor(p.id);
           if (p.phase === 'project') setProgress(p.index / p.total, `Saving ${p.name} (${p.index + 1} of ${p.total})`);
@@ -235,7 +235,7 @@
       setProgress(1, 'Packing the ZIP…');
       await new Promise((r) => setTimeout(r, 30));
       download(D.makeZip(files), `${rootDir}.zip`);
-      const stopped = signal.aborted && done < chosen.length ? ` Stopped after ${done} of ${chosen.length} projects.` : '';
+      const stopped = summary.stopped ? ` Stopped after ${done} of ${chosen.length} projects.` : '';
       const failed = summary.failed ? ` ${summary.failed} project${summary.failed === 1 ? '' : 's'} failed; see _error.txt in the ZIP.` : '';
       setProgress(1, `Exported ${summary.totalChats} chats (${summary.totalMessages.toLocaleString()} messages) from ${done - summary.failed} project${done - summary.failed === 1 ? '' : 's'}.${stopped}${failed}`);
       if (summary.failed) readout.classList.add('error');
@@ -260,5 +260,5 @@
     refreshButton();
   }));
   primary.addEventListener('click', run);
-  stopBtn.addEventListener('click', () => { signal.aborted = true; stopBtn.hidden = true; readout.textContent = 'Stopping after this project…'; });
+  stopBtn.addEventListener('click', () => { if (controller) controller.abort(); stopBtn.hidden = true; readout.textContent = 'Stopping…'; });
 })();
