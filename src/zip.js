@@ -28,15 +28,16 @@
 
   const enc = new TextEncoder();
 
-  /**
-   * @param {{path: string, data: string|Uint8Array}[]} files
-   * @returns {Uint8Array[]} chunks; wrap in a Blob in the browser.
-   */
   // Plain ZIP (no ZIP64): at most 65,535 entries and 4 GiB. Far beyond any chat archive, but
   // fail loudly rather than write a count that wraps around and confuses extractors.
   const MAX_ENTRIES = 0xffff;
   const MAX_BYTES = 0xffffffff;
 
+  /**
+   * @param {{path: string, data: string|Uint8Array}[]} files  Mutated: each entry's data is set to
+   *   null once encoded, so the strings can be collected. Don't reuse the array.
+   * @returns {Uint8Array[]} chunks; wrap in a Blob in the browser.
+   */
   function makeZip(files, now = new Date()) {
     if (files.length > MAX_ENTRIES) throw new Error(`Too many files for one ZIP (${files.length}). Export fewer projects at a time.`);
     const { time, date } = dosDateTime(now);

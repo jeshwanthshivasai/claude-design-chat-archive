@@ -37,9 +37,9 @@
   const oneLine = (v) => asText(v).replace(/\s+/g, ' ').trim();
   const cell = (v) => oneLine(v).replace(/\|/g, '\\|');            // safe inside a Markdown table
   const linkText = (v) => cell(v).replace(/[\[\]]/g, '\\$&');        // safe inside [ ... ]
-  const heading = (v) => oneLine(v).replace(/^#+\s*/, '') || 'Untitled';
+  const heading = (v) => oneLine(v).replace(/^#+\s*/, '');
 
-  const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+  const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(\..*)?$/i;
 
   // Control, zero-width, bidi-override and BOM characters: invisible, and able to disguise a name.
   const INVISIBLE = new RegExp('[\\u0000-\\u001f\\u007f\\u200b-\\u200f\\u2028-\\u202e\\u2066-\\u2069\\ufeff]', 'g');
@@ -240,7 +240,8 @@
     if (m.questionRecord && m.questionRecord.event === 'closed') return renderQuestionRecord(m.questionRecord);
     const isUser = m.role === 'user';
     // In a shared project several people can write; name them when there is more than one.
-    const who = isUser ? (ctx.multiAuthor && oneLine(m.authorName) ? oneLine(m.authorName) : 'You')
+    const author = typeof m.authorName === 'string' ? oneLine(m.authorName) : '';
+    const who = isUser ? (ctx.multiAuthor ? (author || 'Someone') : 'You')
       : m.role === 'assistant' ? 'Claude' : (oneLine(m.role) || 'Message');
     let body;
     if (m.questionRecord) body = renderQuestionRecord(m.questionRecord);
@@ -284,8 +285,10 @@
 
   function renderChat(project, chat, idx, opts) {
     const s = chatStats(chat);
-    const title = heading(chat.title) !== 'Untitled' ? heading(chat.title) : `Chat ${idx}`;
-    const authors = new Set((chat.messages || []).filter((m) => m && m.role === 'user' && !m.pill && m.authorName).map((m) => oneLine(m.authorName)));
+    const title = heading(chat.title) || `Chat ${idx}`;
+    const authors = new Set((chat.messages || [])
+      .filter((m) => m && m.role === 'user' && !m.pill && typeof m.authorName === 'string' && m.authorName.trim())
+      .map((m) => oneLine(m.authorName)));
     const head = [
       `# ${title}`,
       '',
@@ -313,7 +316,7 @@
     const rows = entries.map((e) =>
       `| ${e.idx} | [${linkText(e.title)}](<${e.file}>) | ${fmtDate(e.stats.first, false)} | ${fmtDate(e.stats.last, false)} | ${e.stats.total} |`);
     return [
-      `# ${heading(project.name)}`,
+      `# ${heading(project.name) || 'Untitled'}`,
       '',
       `Created ${fmtDate(project.createdAt || project.created, false)} · last updated ${fmtDate(project.updatedAt, false)} · ${entries.length} chat${entries.length === 1 ? '' : 's'}`,
       '',

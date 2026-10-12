@@ -57,7 +57,10 @@
           throw new RpcError(method, 'session', 'your Claude session may have expired. Reload Claude Design, sign in if asked, and try again.');
         }
         try { return await res.json(); }
-        catch (e) { throw new RpcError(method, 'format', 'the reply was not JSON. Reload Claude Design and try again.'); }
+        catch (e) {
+          if (isAbort(e) || aborted(signal)) throw abortError();
+          throw new RpcError(method, 'format', 'the reply was not JSON. Reload Claude Design and try again.');
+        }
       }
       const retryable = res.status === 429 || res.status >= 500;
       if (retryable && attempt < retries) {
@@ -136,6 +139,11 @@
         progress({ phase: 'error', id: meta.projectId, index: i, total: projects.length, name, error: e.message });
       };
 
+      // Sharing gate. For a project someone else shared, chats are exported only when the server says
+      // so explicitly: a boolean that is left out of the JSON (the usual wire form of "false") counts as no.
+      // Your own projects are exported unless the server explicitly says otherwise.
+      const isShared = meta.source === 'org';
+      let canSeeChats = true;
       let project, data, rawWritten = false;
       try {
         project = await rpc('GetProject', { projectId: meta.projectId }, opts);
@@ -150,7 +158,7 @@
         const finalName = str(project.name).trim() || name;
         const proj = { ...meta, ...project, name: finalName, created: data.created };
         // Respect sharing: if the owner has not shared chats, don't export any, whatever the payload holds.
-        const canSeeChats = project.callerCanSeeChats !== false;
+        canSeeChats = isShared ? project.callerCanSeeChats === true : project.callerCanSeeChats !== false;
         const chats = canSeeChats ? R.sortedChats(data) : [];
         const usedFiles = new Set();
         const entries = [];
@@ -165,7 +173,8 @@
         });
 
         let note = '';
-        if (!canSeeChats) note = 'Owner has not shared chats with you';
+        if (!canSeeChats && project.callerCanSeeChats === false) note = 'Owner has not shared chats with you';
+        else if (!canSeeChats) note = 'Sharing status not reported; chats not exported';
         else if (!chats.length) note = 'No chats';
 
         files.push({ path: `${dir}/_index.md`, data: R.renderProjectIndex(proj, entries) });
@@ -184,10 +193,10 @@
       } catch (e) {
         // Rendering hit a shape we didn't expect. Keep the raw data so nothing is lost, and carry on.
         const keep = { exportedAt, projectId: meta.projectId, name, data };
-        if (!rawWritten) {
+        if (!rawWritten && canSeeChats) {
           try { files.push({ path: `${dir}/_raw/project-data.json`, data: JSON.stringify(keep, null, 2) }); } catch (e2) { /* unserialisable; nothing more to keep */ }
         }
-        fail(new Error(`${e.message} (the raw data was saved in _raw/project-data.json)`));
+        fail(new Error(canSeeChats ? `${e.message} (the raw data was saved in _raw/project-data.json)` : e.message));
       }
 
       if (i < projects.length - 1) {

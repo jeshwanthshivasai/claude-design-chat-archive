@@ -4,7 +4,7 @@
 
 Security, privacy and robustness fixes after an independent review. No change to what the export contains.
 
-- Chats are never exported from a shared project whose owner has not shared them, regardless of what the server returns.
+- Chats from a project someone else shared are exported only when the server explicitly says the owner shared them with you; a missing or false flag means none are exported, and neither is the raw data.
 - A bad date in project data could put `../` into a file name inside the ZIP. File names now only ever contain a formatted date or `undated`.
 - A project with no name, or a message in an unexpected shape, no longer aborts the whole export after all the downloading is done. Such a project is marked failed, its raw data is kept in `_raw/project-data.json`, and the rest of the export continues.
 - Stop now ends the export at once, including mid-request and mid-wait, and the ZIP of what's finished is still produced.

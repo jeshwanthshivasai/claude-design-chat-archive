@@ -46,7 +46,7 @@ Your design files are **not** included. Download those per project from Claude D
 
 Chrome shows a "Disable developer mode extensions" bubble on startup while any unpacked extension is installed. That's expected. Once your ZIP is safely saved, you can remove the extension from `chrome://extensions`.
 
-Works in Chrome and other Chromium browsers (Edge, Brave, Arc, Vivaldi) via the same steps. Firefox is untested.
+Tested in Chrome. Other Chromium browsers (Edge, Brave, Arc, Vivaldi) should work via the same steps but weren't tested; Firefox wasn't either.
 
 ## Use
 
@@ -58,16 +58,16 @@ A project with a few chats takes about a second; a chat with 1,000 messages take
 
 ## How it works
 
-There is no server, no account and no install beyond your own Chrome. Chrome runs the extension's script inside your Claude Design tab, in its own sandbox (an "isolated world") that the page's scripts can't see or alter. When you click **Export**, that script asks the site for your project list and each project's data using the same three internal requests the Claude Design page itself makes when it loads (`ListProjects`, `ListOrgProjects`, `GetProject`), authenticated by the session you're already signed in with. The reply contains the chats. The script turns them into Markdown, builds the ZIP in memory, and hands it to Chrome as a normal download. Nothing is sent anywhere and nothing is kept once the tab closes.
+There is no server, no account and no install beyond your own Chrome. Chrome runs the extension's script inside your Claude Design tab, in its own sandbox (an "isolated world") that the page's scripts can't see or alter. When you click **Export**, that script asks the site for your project list and each project's data using the site's own internal requests (`ListProjects` and `GetProject`, the ones the Claude Design page makes when it loads, plus `ListOrgProjects` for projects shared in a team), authenticated by the session you're already signed in with. The reply contains the chats. The script turns them into Markdown, builds the ZIP in memory, and hands it to Chrome as a normal download. Nothing is sent anywhere and nothing is kept once the tab closes.
 
 Everything above is the user-visible version of `src/`:
 
-| File | What it does | Lines |
-|---|---|---|
-| `src/exporter.js` | the three requests, retries, Stop | ~190 |
-| `src/render.js` | project data → Markdown | ~390 |
-| `src/zip.js` | the ZIP file, written from scratch so there's no third-party code to trust | ~110 |
-| `src/panel.js` | the panel on the page | ~270 |
+| File | What it does |
+|---|---|
+| `src/exporter.js` | the three requests, retries, Stop |
+| `src/render.js` | project data → Markdown |
+| `src/zip.js` | the ZIP file, written from scratch so there's no third-party code to trust |
+| `src/panel.js` | the panel on the page |
 
 ## Privacy and security
 
@@ -76,8 +76,8 @@ Everything above is the user-visible version of `src/`:
 - **Stores nothing.** No settings, no cache, no browser storage. Close the tab and it's gone.
 - **No permissions in the manifest.** Chrome will still describe it as able to "read and change your data on claude.ai", because any extension that runs a script on a site gets that label. It runs only on `claude.ai/design` pages.
 - **Read-only.** It only makes the three requests above. It never sends a message, edits a project or changes a setting.
-- **Shared projects (Team and Enterprise):** projects teammates shared with you are listed but unticked by default. If the owner has not shared the chats with you, the extension exports none of that project's chats, whatever the server sends back.
-- **What the archive contains, so you can decide where to keep it:** the Markdown holds everything said in your chats, including client material, uploaded text and any local file paths you gave Claude. The optional raw JSON holds the complete project data as Claude Design stores it: every message, tool call and file edit (with file contents), Claude's thinking where present, unsent drafts, and internal IDs. Times are shown in your local time with its UTC offset. Treat the ZIP as private.
+- **Shared projects (Team and Enterprise):** projects teammates shared with you are listed but unticked by default. Their chats are exported only when the server states that the owner shared them with you; if it says no, or says nothing, none of that project's chats or raw data are exported. In shared chats with more than one writer, each message is labelled with the writer's display name.
+- **What the archive contains, so you can decide where to keep it:** the Markdown holds everything said in your chats, including client material, uploaded text, any local file paths you gave Claude, and the display names of people who wrote in shared chats. The optional raw JSON holds the complete project data as Claude Design stores it: every message, tool call and file edit (with file contents), Claude's thinking where present, unsent drafts, and internal IDs. Times are shown in your local time with its UTC offset. Treat the ZIP as private.
 - **Transcripts are plain Markdown** and keep any HTML that appeared in the chat. Open them in a text or Markdown editor rather than a web browser.
 - **Terms of service.** Anthropic's consumer terms restrict accessing its services through scripts or by automated means, and its support article on the closure tells you to save anything you need from your chats before the site closes. This is a user-initiated export of your own data, which Anthropic's terms say you own, but it is not an Anthropic-approved tool. Use your own judgement.
 

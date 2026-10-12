@@ -134,6 +134,40 @@ async function test(name, fn) {
     assert.strictEqual(r.summary.projects[0].note, 'Owner has not shared chats with you');
   });
 
+  await test('a shared project whose sharing flag is simply missing exports nothing either (fail closed)', async () => {
+    // Protobuf-style JSON leaves out false booleans, so "not shared" usually arrives as no field at all.
+    const s = server({
+      org: { meta: { projectId: 'org', name: 'Theirs' }, get: { data: b64({ chats: { c: chat('Secret', [msg('user', 'confidential')]) } }) } },
+      mine: { meta: { projectId: 'mine', name: 'Mine' }, get: { data: b64({ chats: { c: chat('Open', [msg('user', 'my own words')]) } }) } },
+    });
+    const ps = await D.listProjects({ fetchImpl: s.fetch });
+    ps.find((p) => p.projectId === 'org').source = 'org'; // as ListOrgProjects would have marked it
+    const r = await D.exportProjects(ps, { fetchImpl: s.fetch, delayMs: 0, includeRaw: true });
+    const text = r.files.map((f) => f.path + '\n' + f.data).join('\n');
+    assert(!text.includes('confidential'), 'shared chat text leaked');
+    assert(!r.files.some((f) => f.path.includes('/Theirs/_raw/')), 'shared raw data leaked');
+    assert.strictEqual(r.summary.projects.find((p) => p.name === 'Theirs').note, 'Sharing status not reported; chats not exported');
+    assert(text.includes('my own words'), 'own project with no flag still exports');
+    assert(r.files.some((f) => f.path.includes('/Mine/_raw/')), 'own raw data still written');
+  });
+
+  await test('the render-failure fallback never writes raw data for an unshared project', async () => {
+    const s = server({
+      org: { meta: { projectId: 'org', name: 'Theirs' }, get: { callerCanSeeChats: false, data: b64({ chats: { c: { title: 'x', messages: 5 } } }) } },
+    });
+    const ps = await D.listProjects({ fetchImpl: s.fetch });
+    ps[0].source = 'org';
+    // Force a render failure after the gate: break the index renderer for this call only.
+    const orig = D.renderProjectIndex;
+    D.renderProjectIndex = () => { throw new Error('boom'); };
+    try {
+      const r = await D.exportProjects(ps, { fetchImpl: s.fetch, delayMs: 0, includeRaw: true });
+      assert.strictEqual(r.summary.failed, 1);
+      assert(!r.files.some((f) => f.path.includes('_raw/')), 'raw data written despite no sharing');
+      assert(!r.files.map((f) => f.data).join('').includes('saved in _raw'), 'error text must not promise raw data that was withheld');
+    } finally { D.renderProjectIndex = orig; }
+  });
+
   await test('a bad date can no longer put ../ into a file name', async () => {
     const s = server({ a: { meta: { projectId: 'a', name: 'T' }, get: { data: b64({ chats: { c: chat('T', [msg('user', 'x', { timestamp: '../../../tmp/pwned' })], { created: '../../../../tmp/pwned' }) } }) } } });
     const r = await D.exportProjects(await D.listProjects({ fetchImpl: s.fetch }), { fetchImpl: s.fetch, delayMs: 0 });
@@ -146,6 +180,7 @@ async function test(name, fn) {
 
   await test('file names are safe on Windows and macOS', () => {
     assert.strictEqual(D.sanitizeName('CON'), '_CON');
+    assert.strictEqual(D.sanitizeName('COM\u00b9'), '_COM\u00b9', 'superscript digits are reserved too');
     assert.strictEqual(D.sanitizeName('aux.design'), '_aux.design');
     assert.strictEqual(D.sanitizeName('a/b\\c:d*e?f"g<h>i|j'), 'a-b-cdefghij');
     assert.strictEqual(D.sanitizeName('..'), 'Untitled');
@@ -199,8 +234,12 @@ async function test(name, fn) {
   await test('shared chats name each author; solo chats say You', () => {
     const solo = D.renderChat({ name: 'P' }, chat('S', [msg('user', 'a', { authorName: 'Me' }), msg('user', 'b', { authorName: 'Me' })]), 1, { includeSteps: true, chatCount: 1 });
     assert(solo.includes('### You ·') && !solo.includes('### Me ·'));
-    const shared = D.renderChat({ name: 'P' }, chat('S', [msg('user', 'a', { authorName: 'Me' }), msg('user', 'b', { authorName: 'Priya' })]), 1, { includeSteps: true, chatCount: 1 });
-    assert(shared.includes('### Me ·') && shared.includes('### Priya ·'));
+    const shared = D.renderChat({ name: 'P' }, chat('S', [msg('user', 'a', { authorName: 'Me' }), msg('user', 'b', { authorName: 'Priya' }), msg('user', 'c')]), 1, { includeSteps: true, chatCount: 1 });
+    assert(shared.includes('### Me ·') && shared.includes('### Priya ·') && shared.includes('### Someone ·'));
+    const odd = D.renderChat({ name: 'P' }, chat('S', [msg('user', 'a', { authorName: {} }), msg('user', 'b', { authorName: 'Me' })]), 1, { includeSteps: true, chatCount: 1 });
+    assert(!odd.includes('### Someone ·') && odd.includes('### You ·'), 'a non-string author name does not flip the chat into multi-author mode');
+    const untitled = D.renderChat({ name: 'P' }, chat('Untitled', [msg('user', 'a')]), 3, { includeSteps: true, chatCount: 3 });
+    assert(untitled.startsWith('# Untitled\n'), 'a chat really called Untitled keeps its name');
   });
 
   await test('transcripts state a UTC offset, not a time zone name', () => {
