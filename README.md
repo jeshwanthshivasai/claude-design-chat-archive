@@ -39,7 +39,7 @@ Your design files are **not** included. Download those per project from Claude D
 
 ## Install (about one minute)
 
-1. Download `claude-design-chat-archive-v1.0.0.zip` from the [latest release](https://github.com/jeshwanthshivasai/claude-design-chat-archive/releases/latest) and unzip it somewhere you'll keep it. Chrome loads the extension from that folder, so don't delete it afterwards.
+1. Open the [latest release](https://github.com/jeshwanthshivasai/claude-design-chat-archive/releases/latest), download **Source code (zip)** under Assets, and unzip it somewhere you'll keep it. Chrome loads the extension from that folder, so don't delete it afterwards.
 2. In Chrome, open `chrome://extensions`.
 3. Turn on **Developer mode** (top right).
 4. Click **Load unpacked** and select the unzipped folder (the one containing `manifest.json`).
