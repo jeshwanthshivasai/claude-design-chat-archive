@@ -4,6 +4,7 @@
 
 - Clicking the toolbar icon now opens the export panel on a Claude Design page, or opens Claude Design with the panel already open. The popup that only gave directions is gone.
 - The Export chats tab is now dark with a light edge and a folder icon, so it stands out on light designs as well as dark ones, and it pulses a few times when the page loads. It sits higher on the right edge, clear of Claude Design's Tweaks panel.
+- New icon and promo tile: a chat bubble being filed into a folder.
 - No new permissions.
 
 ## 1.0.1 (2026-10-13)
