@@ -18,15 +18,27 @@
   button { font: inherit; color: inherit; cursor: pointer; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+  /* Dark ink with a manila edge: reads on light designs and on Claude Design's dark chrome alike. */
   .tab {
-    position: fixed; right: 0; top: 58%; z-index: 2147483646;
+    position: fixed; right: 0; top: 34%; z-index: 2147483646;
     writing-mode: vertical-rl; transform: rotate(180deg);
-    background: var(--manila); color: var(--ink); border: 0;
-    border-radius: 0 8px 8px 0;
-    padding: 16px 9px; font: 600 12.5px/1 var(--sans); letter-spacing: .02em;
-    box-shadow: 2px 0 0 var(--manila-deep), 0 6px 18px rgba(0,0,0,.35);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--ink); color: var(--manila);
+    border: 2px solid var(--manila); border-left: 0;
+    border-radius: 0 10px 10px 0;
+    padding: 18px 12px; font: 700 14px/1 var(--sans); letter-spacing: .03em;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
   }
-  .tab:hover { padding-right: 13px; }
+  .tab svg { width: 18px; height: 18px; transform: rotate(90deg); flex: none; }
+  .tab:hover { padding-right: 17px; background: #2B3A63; }
+  @media (prefers-reduced-motion: no-preference) {
+    .tab.hello { animation: hello 1.6s ease-out 0.8s 3; }
+    @keyframes hello {
+      0% { box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 0 0 0 rgba(234,217,174,.9); }
+      70% { box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 0 0 16px rgba(234,217,174,0); }
+      100% { box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 0 0 0 rgba(234,217,174,0); }
+    }
+  }
   .tab[aria-expanded="true"] { display: none; }
 
   .folder {
@@ -111,7 +123,7 @@
   root.innerHTML = `
     <style>${css}</style>
     <div class="wrap">
-      <button class="tab" aria-expanded="false" aria-controls="dce-folder">Export chats</button>
+      <button class="tab hello" aria-expanded="false" aria-controls="dce-folder"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 6a2 2 0 0 1 2-2h4.2l2 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Export chats</button>
       <section class="folder" id="dce-folder" role="dialog" aria-labelledby="dce-title" aria-modal="false">
         <div class="folder-tab"><h2 id="dce-title">Chat archive</h2></div>
         <div class="body">
@@ -251,6 +263,11 @@
   }
 
   tab.addEventListener('click', open);
+  // The toolbar icon sends this message; it carries no data and only opens the panel.
+  if (globalThis.chrome && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.type === 'dce-open-panel') open(); });
+  }
+  if (location.hash === '#export-chats') open();
   $('.close').addEventListener('click', close);
   root.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !running) close(); });
   list.addEventListener('change', refreshButton);

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Design Chat Archive",
   "short_name": "Chat Archive",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Export your Claude Design chats to Markdown before the site closes on 14 Dec 2026. Unofficial; nothing leaves your browser.",
   "icons": {
     "16": "icons/icon16.png",
@@ -11,8 +11,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Design Chat Archive",
-    "default_popup": "popup.html",
+    "default_title": "Open Design Chat Archive",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"
@@ -31,5 +30,8 @@
       ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }

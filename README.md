@@ -57,7 +57,7 @@ Tested in Chrome. Other Chromium browsers (Edge, Brave, Arc, Vivaldi) should wor
 ## Use
 
 1. Open [claude.ai/design](https://claude.ai/design) while signed in.
-2. Click the **Export chats** tab on the right edge of the page.
+2. Click the extension's icon in Chrome's toolbar (pin it from the puzzle-piece menu), or the dark **Export chats** tab on the right edge of the page.
 3. Untick any projects you don't want, then click **Export**.
 
 A project with a few chats takes about a second; a chat with 1,000 messages takes a couple of seconds. You can keep working in other tabs while it runs, and **Stop** ends the export at once with a ZIP of what's finished.
