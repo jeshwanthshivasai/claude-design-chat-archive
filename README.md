@@ -11,7 +11,7 @@ Unofficial. Not made by or affiliated with Anthropic.
   <img src="docs/exporting.png" alt="The same panel mid-export: two projects done with their chat counts, a progress bar, and Saving Trail running app (3 of 5)" width="367">
 </p>
 
-[Install](#install) · [How it works](#how-it-works) · [Privacy](#privacy-and-security) · [Privacy policy](PRIVACY.md)
+**[Add to Chrome](https://chromewebstore.google.com/detail/lihmgpeogngjlfiiopmanigholpejlei)** · [How it works](#how-it-works) · [Privacy](#privacy-and-security) · [Privacy policy](PRIVACY.md)
 
 ## What you get
 
@@ -41,9 +41,9 @@ Your design files are **not** included. Download those per project from Claude D
 
 ## Install
 
-**Chrome Web Store:** coming soon; the listing is under review. Once it's live, that's the way to install: one click, and updates arrive automatically.
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/lihmgpeogngjlfiiopmanigholpejlei)** and click **Add to Chrome**. That's it; updates arrive automatically.
 
-**Until then, from GitHub (about one minute):**
+**Or load it from GitHub** (if you'd rather run the source yourself):
 
 1. Open the [latest release](https://github.com/jeshwanthshivasai/claude-design-chat-archive/releases/latest), download **Source code (zip)** under Assets, and unzip it somewhere you'll keep it. Chrome loads the extension from that folder, so don't delete it afterwards.
 2. In Chrome, open `chrome://extensions`.
