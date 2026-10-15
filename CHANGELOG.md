@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.0.0 (2026-10-15)
+
+A new home, and four new things in the archive.
+
+- **Side panel.** Clicking the toolbar icon opens Chrome's side panel instead of a tab on the page. It shows:
+  - a ruler counting down the days to 14 Dec
+  - your projects, with search
+  - a choice of what goes in the archive
+  - live progress per project and a Stop button
+  - a finished screen with the ZIP's name and size
+
+  The right-edge "Export chats" tab is gone.
+- **Save chats button.** Every project's toolbar gets a **Save chats** button next to Share, which saves just that project.
+- **Case study per project** (`case-study.html`). A first draft of how the design took shape:
+  - the brief
+  - Claude's questions and your answers
+  - the moments you changed direction
+  - the files that came out of it
+  - the prompts that worked
+- **Offline reader** (`index.html`). Every chat in one page, searchable, with no internet needed.
+- **Prompt library** (`prompts.md`, and in the reader). Your prompts, with the ones that led to work you kept marked.
+- **Wrapped card** (`wrapped.png`). Your Claude Design in numbers, to share. It never shows project names. Your most-used words appear only if you turn them on in the panel.
+- **Sharing rule, tightened.** Chats are saved only when the server says the project is yours or says its owner shared the chats with you. A project the server marks as not yours is treated as shared, whichever list it came from.
+- **Shared chats.** Where several people wrote in a chat, only your own messages count as yours in the case study, prompt library and card.
+- **Raw data.** The raw JSON is now off by default.
+- **Extras never cost you the transcripts.** If an extra can't be made, the archive still downloads and `_extras-error.txt` says why. Archives too large for one reader page skip `index.html`.
+- **No more empty ZIPs.** If none of the chosen projects has chats you can save, nothing is downloaded and the panel says why.
+- **New permission: `sidePanel`.** It shows no install warning. The panel remembers your option switches in this browser; nothing else is stored.
+- **Security fixes from an independent review:**
+  - The reader no longer freezes on file trees or tables without a closing pipe.
+  - Hidden characters are stripped from prompts.
+  - The Save button's markup can't be influenced by the page and only responds to real clicks.
+  - Word counts can't collide with built-in names.
+- **Tests.** There are 30 unit tests, plus an end-to-end run of the real extension in Chromium (`test/e2e.js`).
+
 ## 1.0.2 (2026-10-13)
 
 - Clicking the toolbar icon now opens the export panel on a Claude Design page, or opens Claude Design with the panel already open. The popup that only gave directions is gone.

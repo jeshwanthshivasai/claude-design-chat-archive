@@ -1,38 +1,51 @@
-# Chrome Web Store submission kit
+# Chrome Web Store submission kit (2.0.0)
 
-Everything the dashboard asks for, ready to paste. Files in this folder: `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png` (1280×800), `promo-tile-440x280.png`. The package to upload is built by `store/build.sh` (`design-chat-archive-<version>.zip`, extension files only).
+Everything the dashboard asks for, ready to paste.
+
+**Files in this folder:**
+- `screenshot-1.png` to `screenshot-5.png` (1280×800, made by `node store/shots.js`)
+- `promo-tile-440x280.png`
+- `store-icon-128x128.png`
+
+**The package to upload** is built by `store/build.sh` as `design-chat-archive-<version>.zip`. It contains extension files only.
 
 ## Store listing
 
 **Name** (from the manifest): Design Chat Archive
 
-**Summary** (from the manifest, 132-character limit): Export your Claude Design chats to Markdown before the site closes on 14 Dec 2026. Unofficial; nothing leaves your browser.
+**Summary** (from the manifest, 130 of 132 characters): Unofficial. Saves your Claude Design chats before 14 Dec 2026, plus case studies and a search reader. Nothing leaves your browser.
 
-**Category:** Art & Design (or Workflow & Planning, whichever the dashboard offers)
+**Category:** Art & Design (or Workflow & Planning)
 
 **Language:** English
+
+**Screenshots, in order:**
+1. The side panel next to a project.
+2. The finished archive with the Wrapped card.
+3. A drafted case study.
+4. The offline reader with a search hit.
+5. The Save chats button and its notice.
 
 **Detailed description** (plain text; the store doesn't render Markdown):
 
 ```
-The standalone Claude Design site (claude.ai/design) closes on 14 December 2026. Your project files can be downloaded, but your chats are not migrated and are deleted after the closure. This extension saves every conversation from every project in one click.
+The standalone Claude Design site (claude.ai/design) closes on 14 December 2026. Your project files can be downloaded, but your chats are not migrated and are deleted after the closure. This extension saves every conversation, and turns them into things a designer can use.
 
-WHAT YOU GET
-One ZIP with a folder per project and one readable Markdown transcript per chat, in order:
-• your messages and Claude's replies, with timestamps
-• the questions Claude asked you, with their options, and the answers you picked
-• the steps Claude took in each turn and the files it created or edited
-• the todo list at the time of export
-• optionally, the project's complete raw data as JSON
-• a ready prompt for continuing each project in Claude
+WHAT YOU GET, IN ONE ZIP
+• Chat transcripts: every message, every question Claude asked and the answer you picked, the steps Claude took and the files it made, as readable Markdown.
+• A case study for each project: a first draft of how the design took shape. Your brief, the decisions, the moments you changed direction, what came out of it and the prompts that worked. Plain HTML you can edit into a portfolio piece.
+• An offline reader: one page that shows and searches every chat, no internet needed.
+• A prompt library: your prompts, with the ones that led to work you kept marked, ready to copy back into Claude.
+• A Wrapped card: your Claude Design in numbers, as an image to share. It never shows project names.
+• A ready prompt for continuing each project in Claude.
 
 HOW TO USE IT
-Open claude.ai/design while signed in, click the "Export chats" tab on the right edge of the page, untick anything you don't want, and click Export. A project with a few chats takes about a second. Stop ends the export at once and still gives you a ZIP of what finished.
+Open claude.ai/design while signed in and click the extension's icon. The side panel lists your projects and counts down the days to the closure. Pick projects and extras, click Archive, and one ZIP lands in your Downloads. Inside a project, the Save chats button next to Share saves just that one.
 
 PRIVACY
-Runs entirely in your browser using your existing Claude sign-in. Its only network requests go to claude.ai, the site you're already on. No servers, no analytics, no third-party code, nothing stored. It never sends a message, edits a project or changes a setting. Full policy: https://github.com/jeshwanthshivasai/claude-design-chat-archive/blob/main/PRIVACY.md
+Runs entirely in your browser using your existing Claude sign-in. Its only network requests go to claude.ai, the site you're already on. No servers, no analytics, no third-party code. It remembers only your option switches. It never sends a message, edits a project or changes a setting. Full policy: https://github.com/jeshwanthshivasai/claude-design-chat-archive/blob/main/PRIVACY.md
 
-Shared projects in Team and Enterprise organisations are exported only when the site states their owner shared the chats with you.
+In Team and Enterprise organisations, a shared project's chats are saved only when the site states the owner shared them with you.
 
 Your design files are not included; download those from Claude Design (Share → Project HTML → Project archive).
 
@@ -48,16 +61,24 @@ Unofficial. Not made by, endorsed by, or affiliated with Anthropic. It relies on
 ## Privacy practices tab
 
 **Single purpose description:**
-Export the chats from the user's own Claude Design projects into a ZIP of Markdown files on their computer.
+Save the chats from the user's own Claude Design projects to a ZIP file on their computer. The ZIP holds readable transcripts and documents made from those chats (a case study per project, an offline reader, a prompt library and a summary card).
 
-**Permission justification (host access to claude.ai, from the content script):**
-The extension runs only on claude.ai/design pages. It adds an "Export chats" panel to the page and, when the user clicks Export, requests the user's own project list and project data from the site's own API using the session the user is already signed in with. It makes no requests to any other site. No other permissions are requested.
+**Permission justification, sidePanel:**
+Shows the extension's interface in Chrome's side panel when the user clicks the toolbar icon: the project list, the archive options, progress and the result.
+
+**Permission justification, host access to claude.ai (from the content script):**
+The content script runs only on claude.ai/design pages. It does two things:
+- When the side panel is open, or when the user clicks Archive or Save chats, it requests the user's own project list and project data from the site's own API. It uses the session the user is already signed in with.
+- It adds a "Save chats" button to each project's toolbar.
+
+It makes no requests to any other site.
 
 **Are you using remote code?** No. All code is in the package.
 
 **Data usage: which user data does the extension handle?**
-Tick: *Personal communications* and *Website content*.
-Reason: it reads the user's own chat messages from the Claude Design page they are on and writes them into a local file. Nothing is transmitted anywhere; Google's policy still asks for this to be declared when data is processed locally.
+Tick *Personal communications* and *Website content*.
+
+Reason: it reads the user's own chat messages from the Claude Design page they are on and writes them, plus documents derived from them, into a local file. Nothing is transmitted anywhere. Google's policy still asks for this to be declared when data is processed locally. The only thing stored is the panel's option switches, in the extension's local storage.
 
 **Certifications:** tick all three.
 - I do not sell or transfer user data to third parties, outside of the approved use cases.
@@ -70,17 +91,21 @@ Reason: it reads the user's own chat messages from the Claude Design page they a
 
 Visibility: Public. Regions: all. Price: free.
 
-## Before clicking "Submit for review"
+## Updating from 1.0.x
 
-- Developer account: registered, one-time fee paid, publisher email verified.
-- Package built from the commit you mean to ship, version in `manifest.json` bumped.
-- Privacy policy URL also saved in the account's settings if the dashboard asks for it there.
+1. Upload the new package on the **Package** tab.
+2. Replace the screenshots with the five above.
+3. Paste the new detailed description.
+4. On **Privacy practices**:
+   - add the sidePanel justification
+   - update the single-purpose text and the host-access justification
+5. Submit for review.
+
+The `sidePanel` permission adds no install warning, so existing users are not asked to re-approve.
 
 ## If the review rejects it
 
-The two likely reasons and the fix for each:
+The two likely reasons, and the fix for each:
 
-- **Trademark / impersonation** (the name or listing suggests Anthropic made it): the name already avoids leading with "Claude"; if asked, add "(unofficial)" to the name and resubmit.
-- **Insufficient data disclosure**: make sure *Personal communications* and *Website content* are ticked and the privacy policy URL is present.
-
-Rejections come with a reason by email; resubmission goes back into the queue, usually faster the second time.
+- **Trademark or impersonation** (the name or listing suggests Anthropic made it): the name avoids leading with "Claude", and the summary starts with "Unofficial". If asked, add "(unofficial)" to the name.
+- **Insufficient data disclosure:** check that *Personal communications* and *Website content* are ticked and that the privacy policy URL is present.

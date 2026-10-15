@@ -231,30 +231,36 @@
     return bits.length ? `> *Files:* ${bits.join('; ')}` : '';
   }
 
-  function renderMessage(m, opts, ctx) {
+  // One structured view of a message, shared by the Markdown, the offline viewer and the case study.
+  function messageView(m, opts, ctx) {
     const when = fmtDate(m.timestamp);
-    if (m.pill) {
-      const t = oneLine(m.content);
-      return `<sub>— ${t || 'event'} · ${when} —</sub>`;
-    }
-    if (m.questionRecord && m.questionRecord.event === 'closed') return renderQuestionRecord(m.questionRecord);
+    if (m.pill) return { kind: 'event', when, ts: m.timestamp, body: oneLine(m.content) || 'event' };
+    if (m.questionRecord && m.questionRecord.event === 'closed') return { kind: 'event', when, ts: m.timestamp, body: 'Questions closed' };
     const isUser = m.role === 'user';
     // In a shared project several people can write; name them when there is more than one.
     const author = typeof m.authorName === 'string' ? oneLine(m.authorName) : '';
     const who = isUser ? (ctx.multiAuthor ? (author || 'Someone') : 'You')
       : m.role === 'assistant' ? 'Claude' : (oneLine(m.role) || 'Message');
-    let body;
-    if (m.questionRecord) body = renderQuestionRecord(m.questionRecord);
-    else if (m.questionReceipt) body = renderQuestionReceipt(m, ctx.questionTitles);
+    let body, kind = isUser ? 'you' : 'claude';
+    if (m.questionRecord) { body = renderQuestionRecord(m.questionRecord); kind = 'question'; }
+    else if (m.questionReceipt) { body = renderQuestionReceipt(m, ctx.questionTitles); kind = 'answer'; }
     else body = isUser ? asText(m.content).trim() : assistantBody(m, opts.includeSteps);
     const extra = [...attachmentLines(m.attachments)];
     if (!isUser && opts.includeSteps) { const tc = turnChangesLine(m.turnChanges); if (tc) extra.push(tc); }
-    return [
-      `### ${who} · ${when}`,
-      '',
-      body || '*(no text)*',
-      extra.length ? '\n' + extra.join('\n') : '',
-    ].join('\n').trimEnd();
+    return { kind, who, when, ts: m.timestamp, body: body || '*(no text)*', extra };
+  }
+
+  function renderMessage(m, opts, ctx) {
+    const v = messageView(m, opts, ctx);
+    if (v.kind === 'event') return v.body === 'Questions closed' ? '<sub>— Questions closed —</sub>' : `<sub>— ${v.body} · ${v.when} —</sub>`;
+    return [`### ${v.who} · ${v.when}`, '', v.body, v.extra.length ? '\n' + v.extra.join('\n') : ''].join('\n').trimEnd();
+  }
+
+  function chatContext(chat) {
+    const authors = new Set((chat.messages || [])
+      .filter((m) => m && m.role === 'user' && !m.pill && typeof m.authorName === 'string' && m.authorName.trim())
+      .map((m) => oneLine(m.authorName)));
+    return { questionTitles: questionTitleMap(chat), multiAuthor: authors.size > 1 };
   }
 
   function questionTitleMap(chat) {
@@ -286,9 +292,6 @@
   function renderChat(project, chat, idx, opts) {
     const s = chatStats(chat);
     const title = heading(chat.title) || `Chat ${idx}`;
-    const authors = new Set((chat.messages || [])
-      .filter((m) => m && m.role === 'user' && !m.pill && typeof m.authorName === 'string' && m.authorName.trim())
-      .map((m) => oneLine(m.authorName)));
     const head = [
       `# ${title}`,
       '',
@@ -302,7 +305,7 @@
       `| Times shown in | ${timeZone()} |`,
       '',
     ].join('\n') + '\n---\n\n';
-    const ctx = { questionTitles: questionTitleMap(chat), multiAuthor: authors.size > 1 };
+    const ctx = chatContext(chat);
     const body = (chat.messages || []).map((m) => renderMessage(m, opts, ctx)).join('\n\n---\n\n');
     let tail = '';
     if (Array.isArray(chat.todos) && chat.todos.length) {
@@ -361,11 +364,20 @@
   function renderReadme(summary) {
     const rows = summary.projects.map((p) =>
       `| [${linkText(p.name)}](<${p.folder}/${p.failed ? '_error.txt' : '_index.md'}>) | ${p.chats} | ${p.messages} | ${cell(p.note)} |`);
+    const x = summary.extras || {};
     const lines = [
       '# Claude Design chat archive',
       '',
       `Exported ${fmtDate(summary.exportedAt)} (${timeZone()}) · ${summary.projects.length} projects · ${summary.totalChats} chats · ${summary.totalMessages} messages`,
       '',
+    ];
+    if (x.viewer) lines.push('**Start here:** open `index.html` in your browser. It shows every chat, searchable, and works offline.', '');
+    const top = [];
+    if (x.prompts) top.push('- `prompts.md`: every prompt you wrote, grouped by project, with the ones that led to work you kept marked **Kept**.');
+    if (x.wrapped) top.push('- `wrapped.png`: your Claude Design in numbers, as an image to share. It never shows project names.');
+    if (summary.extrasProblems) top.push('- `_extras-error.txt`: some extras could not be made, and why. The transcripts are complete.');
+    if (top.length) lines.push('## Also in this folder', '', ...top, '');
+    lines.push(
       '| Project | Chats | Messages | Notes |',
       '|---|---|---|---|',
       ...rows,
@@ -375,7 +387,8 @@
       '- `_index.md`: the chats in order, with dates.',
       '- `01 ….md`, `02 ….md`: one readable transcript per chat. Tool steps Claude took are shown as compact lists.',
       '- `_resume-in-claude.md`: how to pick the project up again in Claude, with a ready prompt.',
-    ];
+    );
+    if (x.caseStudy) lines.push('- `case-study.html`: a first draft of the project\'s story (the brief, the decisions, the changes of direction and what came out of it) to edit into a portfolio piece.');
     if (summary.includeRaw) {
       lines.push('- `_raw/project-data.json`: the complete original data as Claude Design stores it: every message, tool call and file edit (including file contents), Claude\'s thinking where present, unsent drafts, and internal IDs. Treat it as private.');
     }
@@ -392,7 +405,8 @@
   }
 
   Object.assign(NS, {
-    fmtDate, fileDate, sanitizeName, uniqueName, sortedChats, chatStats, asText,
+    fmtDate, fileDate, sanitizeName, uniqueName, sortedChats, chatStats, asText, oneLine, clip,
+    messageView, chatContext, questionTitleMap, answerText, turnChangesLine, timeZone,
     renderChat, renderProjectIndex, renderResume, renderReadme, toolHint,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

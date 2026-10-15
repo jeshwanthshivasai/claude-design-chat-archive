@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design Chat Archive</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="82" y="206" width="348" height="226" rx="34" fill="#CDB884"/><rect x="82" y="178" width="140" height="52" rx="26" fill="#CDB884"/>
+      <g transform="rotate(-7 260 150)"><rect x="128" y="58" width="264" height="156" rx="46" fill="#FBF6E9"/><path d="M170 206 142 262 236 208z" fill="#FBF6E9"/><rect x="172" y="100" width="180" height="26" rx="13" fill="#161E38"/><rect x="172" y="152" width="124" height="26" rx="13" fill="#161E38"/></g>
+      <rect x="82" y="268" width="348" height="164" rx="34" fill="#EAD9AE"/>
+    </svg>
+    <span>Design Chat Archive</span>
+  </div>
+  <h1 id="deadline">Save your Claude Design chats.</h1>
+  <p id="deadline-sub" class="sub"></p>
+  <div id="ruler" class="ruler" aria-hidden="true"></div>
+</header>
+
+<main class="folder">
+  <div class="folder-tab"><span id="folder-label">Your projects</span></div>
+  <div class="sheet" id="view" aria-live="polite"></div>
+</main>
+
+<script src="../src/wrapped.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

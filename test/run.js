@@ -14,7 +14,7 @@ const ctx = {
 };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
-for (const f of ['zip', 'render', 'exporter']) {
+for (const f of ['zip', 'render', 'exporter', 'insights', 'casestudy', 'viewer', 'pipeline']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', `${f}.js`), 'utf8'), ctx, { filename: `${f}.js` });
 }
 const D = ctx.DCE;
@@ -40,7 +40,7 @@ function server(projects, opts = {}) {
       const method = url.split('/').pop();
       calls.push(method);
       if (opts.hook) { const r = opts.hook(method, init); if (r) return r; }
-      if (method === 'ListProjects') return ok({ items: Object.values(projects).map((p) => p.meta) });
+      if (method === 'ListProjects') return ok({ items: Object.values(projects).map((p) => ({ isOwned: true, ...p.meta })) });
       if (method === 'ListOrgProjects') return fail(400, 'validation error');
       const { projectId } = JSON.parse(init.body);
       const p = projects[projectId];
@@ -257,6 +257,162 @@ async function test(name, fn) {
     assert.deepStrictEqual(D.decodeData(JSON.stringify({ a: 1 })), { a: 1 });
     assert.deepStrictEqual(D.decodeData(b64({ a: 2 })), { a: 2 });
     assert.strictEqual(Object.keys(D.decodeData('')).length, 0);
+  });
+
+
+  // ---------------------------------------------------------------- 2.0: insights, case study, reader, pipeline
+  const T = (h, m = 0) => `2026-05-04T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`;
+  const steeredChat = () => chat('Landing page', [
+    msg('user', 'Design a landing page for a ceramics studio. Warm, tactile, no stock photos.', { timestamp: T(9) }),
+    msg('assistant', 'A few questions first.', { timestamp: T(9, 1), questionRecord: { event: 'asked', questionId: 'q1', spec: { title: 'Direction', questions: [{ id: 'tone', title: 'Tone' }, { id: 'pages', title: 'Pages' }] } } }),
+    msg('user', '', { timestamp: T(9, 2), questionReceipt: { questionId: 'q1', payload: { tone: { choice: 'Earthy' }, pages: { text: 'Home and shop' } } } }),
+    msg('assistant', 'Here is a first pass.', { timestamp: T(9, 5), turnChanges: { created: ['index.html', 'styles.css'] } }),
+    msg('user', 'Too busy. Strip it back and make the hero one big photo of hands on clay.', { timestamp: T(10) }),
+    msg('assistant', 'Simplified.', { timestamp: T(10, 4), turnChanges: { edited: ['index.html'] } }),
+    msg('user', 'Lovely. Now add a booking section with three class types and prices.', { timestamp: T(11) }),
+    msg('assistant', 'Added.', { timestamp: T(11, 3), turnChanges: { created: ['booking.html'] } }),
+  ]);
+
+  await test('insights find the brief, the answered questions, the change of direction and the prompts that worked', () => {
+    const a = D.analyzeProject({ name: 'Clay' }, [steeredChat()], { assets: { 'index.html': { versions: [{ createdAt: T(9, 5), subtitle: 'v1' }, { createdAt: T(10, 4), subtitle: 'Simpler hero' }] } } }, { owned: true });
+    assert(a.brief.startsWith('Design a landing page'));
+    assert.strictEqual(a.stats.answered, 2);
+    assert.strictEqual(a.stats.turns, 1);
+    const q = a.events.find((e) => e.kind === 'question');
+    assert.strictEqual(q.answers.map((x) => x.q + '=' + x.a).join('|'), 'Tone=Earthy|Pages=Home and shop');
+    assert(a.events.some((e) => e.kind === 'turn' && /Too busy/.test(e.text)));
+    const booking = a.prompts.find((p) => /booking/.test(p.text));
+    assert(booking && booking.kept, 'a prompt followed by new files and no change of direction is kept');
+    const busy = a.prompts.find((p) => /Too busy/.test(p.text));
+    assert(busy && busy.kept, 'the redirect itself led to edits that stuck');
+    assert.strictEqual(a.stats.filesCreated, 3);
+    assert.strictEqual(a.assets[0].versions, 2);
+    const w = D.wrappedStats([a]);
+    assert.strictEqual(w.yours, 3); assert.strictEqual(w.turns, 1); assert.strictEqual(w.projects, 1);
+  });
+
+  const hostile = '</script><script>alert(1)</script><img src=x onerror=alert(2)>';
+  await test('the case study escapes everything that came from a chat', () => {
+    const c = chat(hostile, [msg('user', `Brief ${hostile}`, { timestamp: T(9) }), msg('assistant', 'ok', { timestamp: T(9, 1), turnChanges: { created: [hostile] } }),
+      msg('user', `Instead try ${hostile} with more contrast please`, { timestamp: T(10) })]);
+    const html = D.caseStudyHtml(D.analyzeProject({ name: hostile }, [c], { assets: { [hostile]: { versions: [{ subtitle: hostile }] } } }));
+    assert(!/<script>|<img |onerror=alert\(2\)>/i.test(html.replace(/<style>[\s\S]*?<\/style>/, '')), 'raw markup leaked into the case study');
+    assert(html.includes('&lt;/script&gt;'));
+    assert(!/<script/i.test(html), 'the case study runs no script');
+  });
+
+  await test('the offline reader keeps chat text inert inside its data block and round-trips it exactly', () => {
+    const data = { exportedAt: T(12), projects: [{ n: hostile, f: 'x', cs: true, st: { chats: 1, messages: 1, yours: 1, answered: 0, turns: 0 }, chats: [{ ti: hostile, fi: 'a.md', m: [{ k: 'you', w: 'You', t: T(9), b: `${hostile} line\u2028sep\u2029end <!-- c -->` }] }] }], prompts: [], hasWrappedPng: false };
+    const html = D.viewerHtml(data);
+    const block = html.match(/<script type="application\/json" id="archive-data">([\s\S]*?)<\/script>/);
+    assert(block, 'data block found and ends at its own closing tag');
+    assert(!/<\/script|<!--|<script/i.test(block[1]), 'nothing in the data can close or open a tag');
+    assert(!/[\u2028\u2029]/.test(block[1]));
+    assert.strictEqual(JSON.stringify(JSON.parse(block[1])), JSON.stringify(data));
+    assert.strictEqual((html.match(/<script/g) || []).length, 2, 'only the data block and the reader script');
+  });
+
+  await test('prompts.md cannot be broken out of its code fences', () => {
+    const a = D.analyzeProject({ name: 'P' }, [chat('C', [msg('user', 'first message is the brief, long enough', { timestamp: T(9) }), msg('user', 'Use ```html fences``` and then # a heading in the prompt text', { timestamp: T(10) })])], {}, { owned: true });
+    const md = D.promptsMarkdown([a]);
+    const fences = md.match(/^```/gm) || [];
+    assert.strictEqual(fences.length % 2, 0);
+    assert(!/```html fences```/.test(md));
+  });
+
+  await test('a full run adds the reader, case studies and prompt library, and the README lists only what is there', async () => {
+    const s = server({
+      p1: { meta: { projectId: 'p1', name: 'Clay' }, get: { data: b64({ chats: { c: steeredChat() }, assets: {} }) } },
+      p2: { meta: { projectId: 'p2', name: 'index.html' }, get: { data: b64({ chats: { c: chat('Hi', [msg('user', 'hello there, a small brief')]) } }) } },
+    });
+    const ps = await D.listProjects({ fetchImpl: s.fetch });
+    const r = await D.runExport(ps, { fetchImpl: s.fetch, delayMs: 0, download: false, makePng: false });
+    const names = [];
+    // makeZip nulls the data it packs; read the paths back from the archive's central directory.
+    const buf = Buffer.concat(r.chunks.map((c) => Buffer.from(c)));
+    for (let i = 0; i < buf.length - 4; i++) if (buf.readUInt32LE(i) === 0x02014b50) { const n = buf.readUInt16LE(i + 28); names.push(buf.slice(i + 46, i + 46 + n).toString('utf8')); }
+    const root = r.rootDir;
+    for (const f of ['README.md', 'index.html', 'prompts.md', 'Clay/case-study.html']) assert(names.includes(`${root}/${f}`), `${f} missing:\n${names.join('\n')}`);
+    assert(!names.includes(`${root}/wrapped.png`), 'no card when it was not drawn');
+    assert(names.some((n) => n.startsWith(`${root}/index.html (2)/`)), 'a project called index.html gets its own folder name');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(r.extras)), { viewer: true, caseStudy: true, prompts: true, wrapped: false });
+    const readme = D.renderReadme(r.summary);
+    assert(readme.includes('index.html') && readme.includes('prompts.md') && readme.includes('case-study.html'));
+    assert(!readme.includes('wrapped.png'), 'README does not promise a card that is not there');
+    assert(r.stats && r.stats.projects === 2);
+  });
+
+  await test('extras can be switched off, and a one-project save with no readable chats downloads nothing', async () => {
+    const s = server({ p1: { meta: { projectId: 'p1', name: 'Clay' }, get: { data: b64({ chats: { c: steeredChat() } }) } } });
+    const r = await D.runExport(await D.listProjects({ fetchImpl: s.fetch }), { fetchImpl: s.fetch, delayMs: 0, download: false, makePng: false, extras: { viewer: false, caseStudy: false, prompts: false, wrapped: false } });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(r.extras)), { viewer: false, caseStudy: false, prompts: false, wrapped: false });
+    const s2 = server({ org: { meta: { projectId: 'org', name: 'Theirs' }, get: { callerCanSeeChats: false, data: b64({ chats: { c: chat('Secret', [msg('user', 'confidential')]) } }) } } });
+    const r2 = await D.runExport(await D.listProjects({ fetchImpl: s2.fetch }), { fetchImpl: s2.fetch, delayMs: 0, download: false, makePng: false, requireChats: true });
+    assert.strictEqual(r2.empty, true);
+    assert(!r2.chunks, 'nothing was packed');
+  });
+
+  await test('only one export runs at a time', async () => {
+    const s = server({ p1: { meta: { projectId: 'p1', name: 'A' }, get: { data: b64({ chats: {} }) } } }, { hook: (m) => (m === 'GetProject' ? new Promise((res) => setTimeout(() => res(ok({ data: b64({ chats: {} }) })), 30)) : null) });
+    const ps = await D.listProjects({ fetchImpl: s.fetch });
+    const first = D.runExport(ps, { fetchImpl: s.fetch, delayMs: 0, download: false, makePng: false });
+    await assert.rejects(D.runExport(ps, { fetchImpl: s.fetch, delayMs: 0, download: false, makePng: false }), /already running/);
+    await first;
+    assert.strictEqual(D.isBusy(), false);
+  });
+
+
+  await test('in a shared chat only your own messages count as yours, and a teammate brief is credited to them', () => {
+    const me = 'uuid-me', them = 'uuid-them';
+    const c = chat('Team', [
+      msg('user', 'Teammate writes the brief: a dashboard for the clinic, calm colours.', { timestamp: T(9), authorAccountUuid: them, authorName: 'Priya' }),
+      msg('user', 'Instead of tabs, use a single scrolling page with anchors please.', { timestamp: T(10), authorAccountUuid: me, authorName: 'Jesh' }),
+      msg('assistant', 'Done.', { timestamp: T(10, 2), turnChanges: { edited: ['a.html'] } }),
+      msg('user', 'Rather than blue, try green for the header and buttons everywhere.', { timestamp: T(11), authorAccountUuid: them, authorName: 'Priya' }),
+    ]);
+    const a = D.analyzeProject({ name: 'Clinic' }, [c], {}, { owned: false, myUuid: me });
+    assert.strictEqual(a.stats.yours, 1);
+    assert.strictEqual(a.briefBy, 'Priya');
+    assert.strictEqual(a.prompts.length, 1);
+    assert(/single scrolling page/.test(a.prompts[0].text));
+    assert.strictEqual(a.stats.turns, 1, 'only my change of direction is counted');
+    const unknown = D.analyzeProject({ name: 'Clinic' }, [c], {}, { owned: true });
+    assert.strictEqual(unknown.stats.yours, 0, 'with several writers and no id for me, nobody is assumed to be me');
+  });
+
+  await test('hidden characters are removed from prompts and the brief', () => {
+    const tag = String.fromCodePoint(0xE0041, 0xE0042), zw = '\u200B', bidi = '\u202E';
+    const a = D.analyzeProject({ name: 'P' }, [chat('C', [msg('user', `Brief${tag} text${zw} here, long enough to count`, { timestamp: T(9) }), msg('user', `Make it${bidi} warmer${tag} and quieter overall please, thanks`, { timestamp: T(10) })])], {}, { owned: true });
+    const all = a.brief + a.prompts.map((p) => p.text).join('');
+    assert(!/[\u200B-\u200F\u202A-\u202E]/.test(all) && ![...all].some((ch) => ch.codePointAt(0) >= 0xE0000 && ch.codePointAt(0) <= 0xE007F), JSON.stringify(all));
+  });
+
+  await test('word counts are not confused by names like "constructor"', () => {
+    const a = D.analyzeProject({ name: 'P' }, [chat('C', [msg('user', 'brief first, ignored for words? no, counted', { timestamp: T(9) }), msg('user', 'constructor palette palette palette', { timestamp: T(10) })])], {}, { owned: true });
+    const w = D.wrappedStats([a]);
+    assert.strictEqual(w.topWords[0], 'palette');
+  });
+
+  await test('a failing extra is reported in _extras-error.txt and never costs the archive', async () => {
+    const s = server({ p1: { meta: { projectId: 'p1', name: 'Clay' }, get: { data: b64({ chats: { c: steeredChat() } }) } } });
+    const orig = D.promptsMarkdown;
+    D.promptsMarkdown = () => { throw new Error('boom'); };
+    try {
+      const r = await D.runExport(await D.listProjects({ fetchImpl: s.fetch }), { fetchImpl: s.fetch, delayMs: 0, download: false, makePng: false });
+      assert.strictEqual(r.extras.prompts, false);
+      assert.strictEqual(r.extras.viewer, true, 'the reader is still made');
+      assert.strictEqual(r.problems, 1);
+      const buf = Buffer.concat(r.chunks.map((c) => Buffer.from(c))).toString('latin1');
+      assert(buf.includes('_extras-error.txt') && buf.includes('Prompt library: boom'));
+    } finally { D.promptsMarkdown = orig; }
+  });
+
+  await test('a project the server says is not yours is held to the sharing rule even if it is in your own list', async () => {
+    const s = server({ t: { meta: { projectId: 't', name: 'Theirs', isOwned: false }, get: { data: b64({ chats: { c: chat('Secret', [msg('user', 'confidential')]) } }) } } });
+    const ps = await D.listProjects({ fetchImpl: s.fetch });
+    assert.strictEqual(ps[0].source, 'org');
+    const r = await D.exportProjects(ps, { fetchImpl: s.fetch, delayMs: 0 });
+    assert(!r.files.some((f) => String(f.data).includes('confidential')));
   });
 
   console.log(`\n${passed} passed${process.exitCode ? ', with failures' : ''}`);

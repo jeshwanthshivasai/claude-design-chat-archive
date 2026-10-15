@@ -81,7 +81,8 @@
   async function listProjects(opts) {
     const byId = new Map();
     const mine = await rpc('ListProjects', {}, opts);
-    for (const p of mine.items || []) if (p && p.projectId) byId.set(p.projectId, { ...p, name: projectName(p), source: 'yours' });
+    // A project the server marks as not yours (isOwned: false) is treated as shared, whichever list it came from.
+    for (const p of mine.items || []) if (p && p.projectId) byId.set(p.projectId, { ...p, name: projectName(p), source: p.isOwned === false ? 'org' : 'yours' });
     // Team/Enterprise: projects shared in your organization. Optional; ignore if unavailable.
     try {
       const org = await rpc('ListOrgProjects', { type: 'PROJECT_TYPE_PROJECT' }, { ...opts, retries: 1 });
@@ -110,16 +111,17 @@
 
   /**
    * @param {object[]} projects  items from listProjects
-   * @param {{includeSteps?:boolean, includeRaw?:boolean, onProgress?:Function, signal?:AbortSignal, fetchImpl?:Function, delayMs?:number}} opts
+   * @param {{includeSteps?:boolean, includeRaw?:boolean, rootDir?:string, onProgress?:Function, onProjectData?:Function, signal?:AbortSignal, fetchImpl?:Function, delayMs?:number}} opts
    * @returns {Promise<{files:{path:string,data:string}[], summary:object, rootDir:string}>}
    */
   async function exportProjects(projects, opts = {}) {
     const R = NS;
     const signal = opts.signal;
     const exportedAt = new Date().toISOString();
-    const rootDir = `claude-design-chats-${R.fileDate(exportedAt)}`;
+    const rootDir = opts.rootDir || `claude-design-chats-${R.fileDate(exportedAt)}`;
     const files = [];
-    const usedFolders = new Set(['readme.md']); // the archive README lives at the root
+    // Files that live at the archive root, so no project folder can take their names.
+    const usedFolders = new Set(['readme.md', 'index.html', 'prompts.md', 'wrapped.png', '_extras-error.txt']);
     const summary = { exportedAt, includeRaw: !!opts.includeRaw, projects: [], totalChats: 0, totalMessages: 0, failed: 0, stopped: false };
     const progress = opts.onProgress || (() => {});
     const includeSteps = opts.includeSteps !== false;
@@ -139,9 +141,9 @@
         progress({ phase: 'error', id: meta.projectId, index: i, total: projects.length, name, error: e.message });
       };
 
-      // Sharing gate. For a project someone else shared, chats are exported only when the server says
-      // so explicitly: a boolean that is left out of the JSON (the usual wire form of "false") counts as no.
-      // Your own projects are exported unless the server explicitly says otherwise.
+      // Sharing gate. Chats are exported when the server says explicitly that you can see them. A boolean left
+      // out of the JSON (the usual wire form of "false") counts as no, except for a project the server lists as
+      // yours (isOwned: true), whose chats are exported unless the server explicitly says otherwise.
       const isShared = meta.source === 'org';
       let canSeeChats = true;
       let project, data, rawWritten = false;
@@ -158,7 +160,7 @@
         const finalName = str(project.name).trim() || name;
         const proj = { ...meta, ...project, name: finalName, created: data.created };
         // Respect sharing: if the owner has not shared chats, don't export any, whatever the payload holds.
-        canSeeChats = isShared ? project.callerCanSeeChats === true : project.callerCanSeeChats !== false;
+        canSeeChats = project.callerCanSeeChats === true || (!isShared && meta.isOwned === true && project.callerCanSeeChats !== false);
         const chats = canSeeChats ? R.sortedChats(data) : [];
         const usedFiles = new Set();
         const entries = [];
@@ -190,6 +192,11 @@
         summary.totalChats += chats.length;
         summary.totalMessages += messages;
         progress({ phase: 'done-project', id: meta.projectId, index: i, total: projects.length, name: finalName, chats: chats.length, messages });
+        if (opts.onProjectData && canSeeChats) {
+          // Extras (case study, prompts, stats) see the same data. A failure there never costs the transcripts.
+          try { opts.onProjectData({ meta, proj, project, data, chats, folder, dir, entries, files }); }
+          catch (e) { files.push({ path: `${dir}/_extras-error.txt`, data: `The case study or prompt list could not be made for this project.\n${e.message}\n` }); }
+        }
       } catch (e) {
         // Rendering hit a shape we didn't expect. Keep the raw data so nothing is lost, and carry on.
         const keep = { exportedAt, projectId: meta.projectId, name, data };

@@ -2,3 +2,5 @@
 *.zip
 node_modules/
 __pycache__/
+video/explainer/out/
+video/explainer/public/soundtrack.wav
