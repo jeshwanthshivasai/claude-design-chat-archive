@@ -39,6 +39,22 @@ const PROJECTS = {
       M('assistant', 'Swapped in a camera-first flow. Files:\n|-- home.html\n|-- scan.js\n| a | b\n|\n' + '>'.repeat(30) + ' deep quote\n\n| Screen | State |\n|---|---|\n| Home | done |', T('09-21', 8, 5), { turnChanges: { edited: ['home.html'] } }),
     ] },
   } },
+  'p-bookshop-0005': { name: 'Bookshop rebrand', updatedAt: T('10-02', 18), chats: {
+    a: { title: 'Logo and shelf labels', created: T('09-25', 18), messages: [
+      M('user', 'Rebrand a small secondhand bookshop. Warm, a little nerdy, nothing that looks like a chain store.', T('09-25', 18)),
+      M('assistant', 'Three directions: a stamped library card, a typewriter mark and a hand-cut serif.', T('09-25', 18, 6), { turnChanges: { created: ['brand.html'] } }),
+      M('user', 'Go with the library card. Use the same price tags idea for the shelf labels.', T('09-26', 9)),
+      M('assistant', 'Shelf labels done in the library-card style.', T('09-26', 9, 5), { turnChanges: { created: ['labels.html'] } }),
+    ] },
+  } },
+  'p-trail-0006': { name: 'Trail map app', updatedAt: T('09-28', 7), chats: {
+    a: { title: 'Map screen', created: T('09-26', 7), messages: [
+      M('user', 'A trail map for weekend hikers near Bangalore. Offline first, big tap targets.', T('09-26', 7)),
+      M('assistant', 'Map screen with offline tiles and a trail list.', T('09-26', 7, 5), { turnChanges: { created: ['map.html'] } }),
+      M('user', 'Use the trail colours from the park signage, and make the elevation chart the hero.', T('09-26', 8)),
+      M('assistant', 'Elevation chart is now the hero, in the signage colours.', T('09-26', 8, 4), { turnChanges: { edited: ['map.html'] } }),
+    ] },
+  } },
   'p-poster-0003': { name: 'Running club poster', updatedAt: T('08-30', 7), chats: {
     a: { title: 'Poster', created: T('08-30', 6), messages: [
       M('user', 'A4 poster for a Sunday 6am running club at Cubbon Park. Bold, sunrise colours.', T('08-30', 6)),
@@ -76,7 +92,7 @@ async function launch(opts = {}) {
   let slow = 0;
   const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dca-profile-'));
   const ctx = await chromium.launchPersistentContext(userDir, {
-    headless: false, viewport: { width: 1280, height: 800 }, acceptDownloads: true,
+    headless: false, viewport: { width: 1280, height: 800 }, deviceScaleFactor: opts.scale || 1, acceptDownloads: true,
     args: ['--headless=new', `--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`],
   });
   await ctx.route('https://claude.ai/**', async (route) => {

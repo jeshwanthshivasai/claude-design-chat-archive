@@ -1,11 +1,14 @@
-# Chrome Web Store submission kit (2.0.0)
+# Chrome Web Store submission kit (2.0.x)
 
 Everything the dashboard asks for, ready to paste.
 
 **Files in this folder:**
-- `screenshot-1.png` to `screenshot-5.png` (1280×800, made by `node store/shots.js`)
-- `promo-tile-440x280.png`
-- `store-icon-128x128.png`
+- `screenshot-1.png` to `screenshot-5.png` (1280×800)
+- `promo-tile-440x280.png` (small promo tile, required; no text, as the store asks)
+- `marquee-1400x560.png` (optional marquee; needed only to be featured)
+- `store-icon-128x128.png` (the same art as `icons/icon128.png`)
+
+All of them are built from the real extension by `node store/make-assets.js`.
 
 **The package to upload** is built by `store/build.sh` as `design-chat-archive-<version>.zip`. It contains extension files only.
 
@@ -20,11 +23,11 @@ Everything the dashboard asks for, ready to paste.
 **Language:** English
 
 **Screenshots, in order:**
-1. The side panel next to a project.
-2. The finished archive with the Wrapped card.
-3. A drafted case study.
-4. The offline reader with a search hit.
-5. The Save chats button and its notice.
+1. Save every Claude Design chat before 14 Dec (the side panel next to a project).
+2. Every project, drafted as a case study.
+3. Search every chat, even offline (the reader).
+4. Or save one project from its toolbar (the Save chats button and its notice).
+5. Your Claude Design, in numbers (the Wrapped card, with sample numbers).
 
 **Detailed description** (plain text; the store doesn't render Markdown):
 

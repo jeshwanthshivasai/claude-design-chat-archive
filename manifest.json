@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Design Chat Archive",
   "short_name": "Chat Archive",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Unofficial. Saves your Claude Design chats before 14 Dec 2026, plus case studies and a search reader. Nothing leaves your browser.",
   "minimum_chrome_version": "116",
   "icons": {

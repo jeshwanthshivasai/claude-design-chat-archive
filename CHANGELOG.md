@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 (2026-10-15)
+
+- New icon: a chat bubble going into a manila folder on a navy tile. It reads clearly at 16 px on both light and dark toolbars.
+- New store images: five screenshots, a promo tile and marquee art without text (as the Chrome Web Store asks for promo images), all built from the real extension by `node store/make-assets.js`.
+- No code changes from 2.0.0.
+
 ## 2.0.0 (2026-10-15)
 
 A new home, and four new things in the archive.
