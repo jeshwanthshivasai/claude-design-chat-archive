@@ -5,7 +5,6 @@
 A new home, and four new things in the archive.
 
 - **New icon:** a chat bubble going into a manila folder on a navy tile. It reads clearly at 16 px on light and dark toolbars. The store images are built from the real extension by `node store/make-assets.js`.
-
 - **Side panel.** Clicking the toolbar icon opens Chrome's side panel instead of a tab on the page. It shows:
   - a ruler counting down the days to 14 Dec
   - your projects, with search
